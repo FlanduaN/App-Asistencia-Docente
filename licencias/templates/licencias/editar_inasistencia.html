@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editar Inasistencia</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen font-sans flex items-center justify-center p-4">
+
+    <div class="bg-white rounded-xl shadow-md border border-slate-200 max-w-xl w-full p-6 space-y-5">
+        <div class="border-b border-slate-100 pb-3">
+            <h2 class="text-xl font-bold text-slate-900">Editando registro de: <span class="text-indigo-600">{{ licencia.docente.user.get_full_name }}</span></h2>
+            <p class="text-xs text-slate-500">Modifica los detalles de la incidencia o ausencia docente.</p>
+        </div>
+
+        <form method="post" enctype="multipart/form-data" class="space-y-4">
+            {% csrf_token %}
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Docente Afectado</label>
+                {{ form.docente }}
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Tipo de Licencia / Artículo</label>
+                {{ form.tipo_licencia }}
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Fecha de la Inasistencia</label>
+                {{ form.fecha_solicitud }}
+            </div>
+
+            <!-- NUEVO CAMPO: TIPO DE INCIDENCIA -->
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Tipo de Incidencia</label>
+                {{ form.tipo_incidencia }}
+            </div>
+
+            <!-- TIEMPOS Y TARDANZAS -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Minutos de Tardanza</label>
+                    {{ form.minutos_tarde }}
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Minutos de Retiro Anticipado</label>
+                    {{ form.minutos_retiro }}
+                </div>
+            </div>
+
+            <!-- BLOQUES ESPECIFICOS -->
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Bloques Afectados (Solo para selección puntual)</label>
+                {{ form.bloques_afectados }}
+                <p class="text-[11px] text-slate-400 mt-1">Mantén presionado Ctrl (o Cmd) para seleccionar múltiples bloques si aplica.</p>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Certificado / Comprobante</label>
+                {{ form.comprobante_pdf }}
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Observaciones</label>
+                {{ form.observaciones }}
+            </div>
+
+            <div class="flex items-center gap-3 pt-3">
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg shadow transition-all">
+                    💾 Guardar Cambios
+                </button>
+                <a href="{% url 'dashboard_regencia' %}?fecha={{ licencia.fecha_solicitud|date:'Y-m-d' }}" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 text-center rounded-lg transition-all">
+                    Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,26 @@
+# 1. Entorno Virtual (¡Nunca debe subirse, pesa demasiado!)
+venv/
+env/
+ENV/
+
+# 2. Archivos temporales de Python (Cache compilada)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 3. Base de Datos Local (SQLite)
+# Se ignora para que cada desarrollador tenga su propia base de prueba limpia
+db.sqlite3
+
+# 4. Archivos subidos por los usuarios (certificados/médicos)
+media/
+comprobantes/
+
+# 5. Configuraciones de Editores de Código y Sistema Operativo
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 6. Archivos Excel de prueba local
+*.xlsx

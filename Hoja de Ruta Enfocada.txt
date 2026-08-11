@@ -1,0 +1,22 @@
+Hoja de Ruta Enfocada (Django + SQLite)
+
+Fase 1: Configuración y Modelos (Semanas 1-2)
+•	Crear el proyecto Django y configurar la app de licencias.
+•	Diseñar la base de datos en models.py (Docente, SolicitudLicencia, TipoLicencia).
+•	Configurar el panel de administración de Django (donde los directivos ya podrán ver y editar los datos de forma nativa).
+
+Fase 2: Autenticación y Frontend Base (Semanas 3-4)
+•	Implementar el login con los correos institucionales.
+•	Maquetar la interfaz del docente (Formulario de solicitud) y la del administrativo (Listado de aprobaciones) usando HTML limpio y Tailwind/Bootstrap.
+
+Fase 3: El "Convertidor" a PDF y Archivos (Semanas 5-6)
+•	Programar la lógica en Python que recibe el adjunto del docente, detecta el formato y lo transforma a un .pdf estandarizado antes de almacenarlo en el servidor del colegio.
+
+Fase 4: Lógica de Negocio y Pruebas (Semanas 7-8)
+•	Aquí nos sentamos a definir las restricciones del punto 3-3 y las programamos.
+•	Pruebas locales con SQLite.
+
+Fase 5: Migración y Despliegue (Semanas 9-10)
+•	Configurar PostgreSQL en el servidor en la nube del colegio.
+•	Ejecutar las migraciones de Django (pasar de SQLite a Postgres es literalmente ejecutar un comando en Django, el framework hace todo el trabajo pesado).
+•	¡Lanzamiento!
