@@ -1,45 +1,17 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grilla Horaria de Cobertura</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-slate-50 text-slate-800 min-h-screen font-sans">
+{% extends 'licencias/base.html' %}
 
-<!-- BARRA SUPERIOR CON CONMUTADOR DE ROLES -->
-    <header class="bg-indigo-700 text-white shadow-md p-4">
-        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
-            <h1 class="text-xl font-bold tracking-wide">🏫 Sistema de Asistencia Docente</h1>
-            
-            <!-- CONMUTADOR RÁPIDO DE PERFILES DE PRUEBA -->
-            <div class="flex items-center gap-1 bg-indigo-900/60 p-1.5 rounded-xl border border-indigo-500/30 text-xs">
-                <span class="text-indigo-200 font-medium px-2">Rol activo:</span>
-                
-                <a href="{% url 'cambiar_perfil' 'regente' %}" 
-                   class="px-2.5 py-1 rounded-lg transition-all font-bold {% if request.session.perfil_activo == 'regente' or not request.session.perfil_activo %}bg-amber-400 text-slate-900 shadow-sm{% else %}text-indigo-200 hover:bg-indigo-800{% endif %}">
-                    Regencia
-                </a>
+{% block title %}Gestión de Docentes - Sistema de Asistencia{% endblock %}
 
-                <a href="{% url 'cambiar_perfil' 'preceptor' %}" 
-                   class="px-2.5 py-1 rounded-lg transition-all font-bold {% if request.session.perfil_activo == 'preceptor' %}bg-amber-400 text-slate-900 shadow-sm{% else %}text-indigo-200 hover:bg-indigo-800{% endif %}">
-                    Preceptoría
-                </a>
-
-                <a href="{% url 'cambiar_perfil' 'secretario' %}" 
-                   class="px-2.5 py-1 rounded-lg transition-all font-bold {% if request.session.perfil_activo == 'secretario' %}bg-amber-400 text-slate-900 shadow-sm{% else %}text-indigo-200 hover:bg-indigo-800{% endif %}">
-                    Secretaría
-                </a>
-            </div>
-        </div>
-    </header>
-    
+{% block content %}
+<div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
     <main class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
         
         <!-- HEADER VISTA GRILLA -->
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between bg-white p-6 rounded-xl shadow-sm border border-slate-200 gap-4">
             <div>
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-0.5 rounded-full">Vista Preceptoría</span>
+                </div>
                 <h2 class="text-2xl font-bold text-slate-900">Grilla Horaria del Día</h2>
                 <p class="text-slate-500 font-medium">
                     Estado de todos los bloques para el día: 
@@ -119,5 +91,5 @@
         </div>
 
     </main>
-</body>
-</html>
+</div>
+{% endblock %}

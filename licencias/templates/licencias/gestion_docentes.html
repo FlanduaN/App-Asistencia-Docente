@@ -1,0 +1,102 @@
+{% extends 'licencias/base.html' %}
+
+{% block title %}Gestión de Docentes - Sistema de Asistencia{% endblock %}
+
+{% block content %}
+<div class="bg-white p-6 rounded-xl shadow-sm border border-sl ate-200">
+
+    <header class="bg-indigo-700 text-white p-4 shadow-md rounded-xl ">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold">🏫 Secretaría - Gestión de Personal</h1>
+            <a href="{% url 'dashboard_secretaria' %}" class="text-xs bg-indigo-800 hover:bg-indigo-900 px-3 py-1.5 rounded-lg font-bold">← Volver al Panel</a>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto p-6 space-y-6">
+        
+        <!-- MENSAJES DE NOTIFICACIÓN -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="p-4 rounded-xl text-sm font-bold shadow-sm {% if message.tags == 'success' %}bg-emerald-100 text-emerald-800 border border-emerald-300{% else %}bg-amber-100 text-amber-800 border border-amber-300{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div>
+                <h2 class="text-xl font-bold text-slate-900">Listado de Docentes y Personal</h2>
+                <p class="text-xs text-slate-500">Administra las altas, bajas lógicas y claves de acceso.</p>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <!-- Filtro Activos / Inactivos -->
+                <div class="bg-slate-100 p-1 rounded-lg border text-xs font-bold flex">
+                    <a href="{% url 'gestion_docentes' %}" class="px-3 py-1.5 rounded-md {% if not ver_inactivos %}bg-white shadow-sm text-indigo-700{% else %}text-slate-600{% endif %}">
+                        Activos ({{ total_activos }})
+                    </a>
+                    <a href="{% url 'gestion_docentes' %}?inactivos=1" class="px-3 py-1.5 rounded-md {% if ver_inactivos %}bg-white shadow-sm text-red-600{% else %}text-slate-600{% endif %}">
+                        Bajas / Histórico ({{ total_inactivos }})
+                    </a>
+                </div>
+
+                <a href="{% url 'alta_docente' %}" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-4 py-2 rounded-lg shadow-sm transition-all flex items-center gap-1">
+                    ➕ Alta Nuevo Usuario
+                </a>
+            </div>
+        </div>
+
+        <!-- TABLA DE DOCENTES -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-slate-100 text-slate-600 uppercase text-[11px] font-bold border-b border-slate-200">
+                    <tr>
+                        <th class="p-4">Legajo / DNI</th>
+                        <th class="p-4">Nombre Completo</th>
+                        <th class="p-4">Correo Electrónico</th>
+                        <th class="p-4">Estado</th>
+                        <th class="p-4 text-right">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for docente in docentes %}
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-4 font-bold text-slate-900">{{ docente.legajo }}</td>
+                        <td class="p-4 font-semibold text-slate-800">{{ docente.user.get_full_name }}</td>
+                        <td class="p-4 text-slate-600">{{ docente.user.email }}</td>
+                        <td class="p-4">
+                            {% if docente.user.is_active %}
+                                <span class="bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-1 rounded-full">Activo</span>
+                            {% else %}
+                                <span class="bg-red-100 text-red-800 text-xs font-bold px-2.5 py-1 rounded-full">Baja Lógica</span>
+                            {% endif %}
+                        </td>
+                        <td class="p-4 text-right space-x-2">
+                            {% if docente.user.is_active %}
+                                <a href="{% url 'dar_de_baja_docente' docente.id %}" 
+                                   onclick="return confirm('¿Seguro que deseas dar de baja a este docente? No se borrarán sus clases ni historial.')"
+                                   class="text-xs bg-red-50 text-red-600 hover:bg-red-100 font-bold px-3 py-1.5 rounded-lg border border-red-200">
+                                    🔴 Dar de Baja
+                                </a>
+                            {% else %}
+                                <a href="{% url 'reactivar_docente' docente.id %}" 
+                                   class="text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold px-3 py-1.5 rounded-lg border border-emerald-200">
+                                    🟢 Reactivar
+                                </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="p-8 text-center text-slate-500 text-sm">
+                            No se encontraron registros en esta lista.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    </main>
+</div>
+{% endblock %}

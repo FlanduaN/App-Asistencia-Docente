@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alta de Docente - Secretaría</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 min-h-screen flex items-center justify-center p-4">
+
+    <!-- MODAL / POPUP PARA NOTIFICACIÓN DE MAIL DUPLICADO -->
+    {% if form.email.errors and "DUPLICADO_MAIL" in form.email.errors.0 %}
+    <div id="modalDuplicate" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-red-200 text-center space-y-4 animate-bounce-once">
+            <div class="w-14 h-14 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
+                ⚠️
+            </div>
+            <h3 class="text-xl font-bold text-slate-900">Correo Ya Registrado</h3>
+            <p class="text-xs text-slate-600 leading-relaxed">
+                El correo electrónico ingresado ya pertenece a un usuario activo en el sistema. No es posible crear dos cuentas con la misma dirección.
+            </p>
+            <button onclick="document.getElementById('modalDuplicate').remove()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-xl transition-all text-sm shadow-md">
+                Entendido, corregir correo
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full border border-slate-200">
+        <div class="border-b border-slate-100 pb-4 mb-6">
+            <h2 class="text-2xl font-bold text-slate-900">Alta de Nuevo Personal</h2>
+            <p class="text-xs text-slate-500 mt-0.5">El nombre de usuario se creará automáticamente con la primera parte del correo.</p>
+        </div>
+
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+            
+            <!-- NOMBRE Y APELLIDO -->
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre</label>
+                    {{ form.first_name }}
+                    {% if form.first_name.errors %}<p class="text-red-600 text-[11px] mt-1">{{ form.first_name.errors.0 }}</p>{% endif %}
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Apellido</label>
+                    {{ form.last_name }}
+                    {% if form.last_name.errors %}<p class="text-red-600 text-[11px] mt-1">{{ form.last_name.errors.0 }}</p>{% endif %}
+                </div>
+            </div>
+
+            <!-- MAIL (USUARIO) -->
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Correo Electrónico (Será el usuario de ingreso)</label>
+                {{ form.email }}
+                {% if form.email.errors and "DUPLICADO_MAIL" not in form.email.errors.0 %}
+                    <p class="text-red-600 text-[11px] mt-1 font-bold">{{ form.email.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <!-- TELÉFONO / CELULAR-->
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Teléfono / Celular</label>
+                {{ form.telefono }}
+            </div>
+
+            <!-- DNI Y LEGAJO (SEPARADOS) -->
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">DNI</label>
+                    {{ form.dni }}
+                    {% if form.dni.errors %}<p class="text-red-600 text-[11px] mt-1 font-bold">{{ form.dni.errors.0 }}</p>{% endif %}
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-xs font-bold text-slate-700 uppercase">N° Legajo</label>
+                        <span class="text-[10px] text-amber-700 font-bold bg-amber-100 px-1.5 py-0.5 rounded">Sugerido</span>
+                    </div>
+                    {{ form.legajo }}
+                    {% if form.legajo.errors %}<p class="text-red-600 text-[11px] mt-1 font-bold">{{ form.legajo.errors.0 }}</p>{% endif %}
+                </div>
+            </div>
+
+            <!-- ROL -->
+            <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Cargo / Rol Asignado</label>
+                {{ form.rol }}
+            </div>
+
+            <div class="pt-4 flex gap-3">
+                <a href="{% url 'gestion_docentes' %}" class="w-1/2 text-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-lg text-sm transition-all">
+                    Cancelar
+                </a>
+                <button type="submit" class="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-sm shadow-md transition-all">
+                    Registrar y Enviar Email
+                </button>
+            </div>
+        </form>
+    </div>
+
+</body>
+</html>

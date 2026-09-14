@@ -33,7 +33,13 @@ python manage.py createsuperuser
 
 python manage.py cargar_horarios horarios_colegio.xlsx
 
-7. Iniciar el servidor web
+7. (Opcional) Generar la estructura del proyecto
+
+ejecutar python mapa.py
+
+Esto generará un archivo estructura_proyecto.txt
+
+8. Iniciar el servidor web
 
 python manage.py runserver
 

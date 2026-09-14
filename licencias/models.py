@@ -4,7 +4,9 @@ from django.contrib.auth.models import User
 class Docente(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     legajo = models.CharField(max_length=20, unique=True)
+    dni = models.CharField(max_length=20, unique=True, null=True, blank=True)
     telefono = models.CharField(max_length=20, blank=True, null=True)
+    debe_cambiar_password = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.user.last_name}, {self.user.first_name} ({self.legajo})"
@@ -82,7 +84,9 @@ class SolicitudLicencia(models.Model):
 
     docente = models.ForeignKey(Docente, on_delete=models.CASCADE, related_name='licencias')
     tipo_licencia = models.ForeignKey(TipoLicencia, on_delete=models.PROTECT)
-    fecha_solicitud = models.DateField()
+
+    fecha_solicitud = models.DateField(verbose_name="Fecha Desde")
+    fecha_hasta = models.DateField(null=True, blank=True, verbose_name="Fecha Hasta")
     
     tipo_incidencia = models.CharField(max_length=10, choices=TIPO_INCIDENCIA_CHOICES, default='COMPLETO')
     minutos_tarde = models.PositiveIntegerField(default=0, blank=True, null=True)
@@ -93,6 +97,12 @@ class SolicitudLicencia(models.Model):
     comprobante_pdf = models.FileField(upload_to='comprobantes/', null=True, blank=True)
     observaciones = models.TextField(blank=True, null=True)
     estado = models.CharField(max_length=20, choices=ESTADOS, default='PENDIENTE')
+
+    def save(self, *args, **kwargs):
+        # Si no se ingresa 'fecha_hasta', la licencia dura 1 solo día
+        if not self.fecha_hasta:
+            self.fecha_hasta = self.fecha_solicitud
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Licencia {self.docente.user.last_name} - {self.fecha_solicitud} [{self.estado}]"

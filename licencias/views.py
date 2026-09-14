@@ -1,19 +1,81 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
+from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm
+from django.contrib.auth.decorators import login_required
+from django.core.mail import send_mail
+from django.contrib import messages
+from django.contrib.auth.models import User
 from datetime import date, datetime, timedelta
 from .models import HorarioDocente, SolicitudLicencia, Docente, BloqueHorario, Suplencia
-from .forms import SolicitudLicenciaForm
+from .forms import SolicitudLicenciaForm, AltaDocenteForm, obtener_siguiente_legajo
 
 
 # ------------------------------------------------------------------
-# CONMUTADOR RÁPIDO DE PERFILES DE PRUEBA
+# AUTENTICACIÓN Y CONTROL DE ACCESO
 # ------------------------------------------------------------------
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard_regencia')
+
+    if request.method == 'POST':
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            
+            # Verificar si el docente requiere cambio obligatorio de clave provisoria
+            try:
+                if hasattr(user, 'docente') and user.docente.debe_cambiar_password:
+                    messages.info(request, "Por seguridad, debes cambiar tu clave provisoria en el primer inicio.")
+                    return redirect('cambiar_password')
+            except Exception:
+                pass
+
+            return redirect('dashboard_regencia')
+        else:
+            messages.error(request, "Usuario o contraseña incorrectos.")
+    else:
+        form = AuthenticationForm()
+
+    return render(request, 'licencias/login.html', {'form': form})
+
+
+@login_required
+def cambiar_password_view(request):
+    if request.method == 'POST':
+        form = PasswordChangeForm(user=request.user, data=request.POST)
+        if form.is_valid():
+            user = form.save()
+            update_session_auth_hash(request, user)  # Mantiene la sesión activa
+            
+            # Desactivar bandera de cambio de clave obligatoria
+            try:
+                if hasattr(user, 'docente'):
+                    docente = user.docente
+                    docente.debe_cambiar_password = False
+                    docente.save()
+            except Exception:
+                pass
+
+            messages.success(request, "¡Tu contraseña se ha actualizado exitosamente!")
+            return redirect('dashboard_regencia')
+    else:
+        form = PasswordChangeForm(user=request.user)
+
+    return render(request, 'licencias/cambiar_password.html', {'form': form})
+
+
+def logout_view(request):
+    logout(request)
+    return redirect('login')
+
+
+# ------------------------------------------------------------------
+# CONMUTADOR RÁPIDO DE PERFILES
+# ------------------------------------------------------------------
+@login_required
 def cambiar_perfil(request, perfil):
-    """
-    Guarda el perfil activo en la sesión y redirige a la vista correspondiente.
-    """
-    perfiles_validos = ['regente', 'preceptor', 'secretario']
+    perfiles_validos = ['regente', 'preceptor', 'secretario', 'docente']
     if perfil in perfiles_validos:
         request.session['perfil_activo'] = perfil
 
@@ -21,28 +83,10 @@ def cambiar_perfil(request, perfil):
         return redirect('grilla_horaria')
     elif perfil == 'secretario':
         return redirect('dashboard_secretaria')
+    elif perfil == 'docente':
+        return redirect('dashboard_docente')
     else:
         return redirect('dashboard_regencia')
-
-
-# ------------------------------------------------------------------
-# PANTALLA DE LOGIN (Deshabilitada obligatoriedad por ahora)
-# ------------------------------------------------------------------
-def login_view(request):
-    if request.method == 'POST':
-        form = AuthenticationForm(request, data=request.POST)
-        if form.is_valid():
-            user = form.get_user()
-            login(request, user)
-            return redirect('dashboard_regencia')
-    else:
-        form = AuthenticationForm()
-    return render(request, 'licencias/login.html', {'form': form})
-
-
-def logout_view(request):
-    logout(request)
-    return redirect('login')
 
 
 # ------------------------------------------------------------------
@@ -72,8 +116,88 @@ def es_bloque_afectado(bloque, licencia, todos_bloques_docente):
 
 
 # ------------------------------------------------------------------
+# GESTIÓN DE PERSONAL (SECRETARÍA)
+# ------------------------------------------------------------------
+@login_required
+def gestion_docentes(request):
+    ver_inactivos = request.GET.get('inactivos') == '1'
+    
+    if ver_inactivos:
+        docentes = Docente.objects.filter(user__is_active=False).select_related('user')
+    else:
+        docentes = Docente.objects.filter(user__is_active=True).select_related('user')
+
+    contexto = {
+        'docentes': docentes,
+        'ver_inactivos': ver_inactivos,
+        'total_activos': Docente.objects.filter(user__is_active=True).count(),
+        'total_inactivos': Docente.objects.filter(user__is_active=False).count(),
+        'perfil_actual': 'secretario'
+    }
+    return render(request, 'licencias/gestion_docentes.html', contexto)
+
+
+@login_required
+def alta_docente(request):
+    if request.method == 'POST':
+        form = AltaDocenteForm(request.POST)
+        if form.is_valid():
+            docente, password_provisoria, username_generado = form.save()
+            
+            asunto = "Bienvenido/a al Sistema de Asistencia - Datos de Acceso"
+            mensaje = (
+                f"Hola {docente.user.first_name},\n\n"
+                f"Se ha creado tu cuenta en el Sistema de Asistencia Institucional.\n\n"
+                f"Tus credenciales de acceso son:\n"
+                f"📌 Usuario de ingreso: {username_generado}\n"
+                f"🔑 Clave Provisoria: {password_provisoria}\n\n"
+                f"Por favor, ingresa al sistema y cambia tu contraseña en el primer inicio.\n"
+            )
+            
+            try:
+                send_mail(
+                    asunto,
+                    mensaje,
+                    'no-reply@colegio.edu.ar',
+                    [docente.user.email],
+                    fail_silently=False,
+                )
+                messages.success(request, f"Docente {docente.user.get_full_name()} creado. Usuario: '{username_generado}'. Se envió la clave a {docente.user.email}.")
+            except Exception:
+                messages.warning(request, f"Docente creado pero no se pudo enviar el mail. Usuario: '{username_generado}' | Clave provisoria: {password_provisoria}")
+
+            return redirect('gestion_docentes')
+    else:
+        form = AltaDocenteForm(initial={
+            'legajo': obtener_siguiente_legajo()
+        })
+
+    return render(request, 'licencias/alta_docente.html', {'form': form})
+
+
+@login_required
+def dar_de_baja_docente(request, docente_id):
+    docente = get_object_or_404(Docente, id=docente_id)
+    docente.user.is_active = False
+    docente.user.save()
+    messages.info(request, f"El docente {docente.user.get_full_name()} ha sido dado de baja (archivado).")
+    return redirect('gestion_docentes')
+
+
+@login_required
+def reactivar_docente(request, docente_id):
+    docente = get_object_or_404(Docente, id=docente_id)
+    docente.user.is_active = True
+    docente.user.save()
+    messages.success(request, f"El docente {docente.user.get_full_name()} ha sido reactivado exitosamente.")
+    return redirect('gestion_docentes')
+
+
+# ------------------------------------------------------------------
 # VISTAS DE PANELES Y DASHBOARDS
 # ------------------------------------------------------------------
+# ---- vista principal para el perfil de regencia
+@login_required
 def dashboard_regencia(request):
     request.session['perfil_activo'] = request.session.get('perfil_activo', 'regente')
     fecha_param = request.GET.get('fecha')
@@ -90,8 +214,10 @@ def dashboard_regencia(request):
     nombre_dias = {1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves', 5: 'Viernes', 6: 'Sábado', 7: 'Domingo'}
     dia_actual_nombre = nombre_dias.get(dia_actual_num, 'Lunes')
 
+    # (Consulta por Rango de Fechas):
     licencias_hoy = SolicitudLicencia.objects.filter(
-        fecha_solicitud=fecha_seleccionada
+        fecha_solicitud__lte=fecha_seleccionada,
+        fecha_hasta__gte=fecha_seleccionada
     ).select_related('docente__user', 'tipo_licencia').prefetch_related('bloques_afectados')
 
     ausencias_procesadas = []
@@ -116,7 +242,7 @@ def dashboard_regencia(request):
                     'suplencia': suplencia
                 })
 
-        if bloques_evaluados:
+        # SE INCLUYE SIEMPRE LA LICENCIA EN EL PANEL (con o sin horarios asignados)
             ausencias_procesadas.append({
                 'licencia': licencia,
                 'docente': licencia.docente,
@@ -134,9 +260,9 @@ def dashboard_regencia(request):
     
     return render(request, 'licencias/dashboard.html', contexto)
 
-
+# ---- vista principal para el perfil de preceptoría (grilla horaria)
+@login_required
 def grilla_horaria(request):
-    """ VISTA UTILIZADA POR PRECEPTOR/A Y REGENTE """
     fecha_param = request.GET.get('fecha')
     if fecha_param:
         try:
@@ -151,8 +277,11 @@ def grilla_horaria(request):
     dia_actual_nombre = nombre_dias.get(dia_actual_num, 'Lunes')
 
     bloques = BloqueHorario.objects.all().order_by('numero')
+
+    # (Consulta por Rango de Fechas):
     licencias_hoy = SolicitudLicencia.objects.filter(
-        fecha_solicitud=fecha_seleccionada
+        fecha_solicitud__lte=fecha_seleccionada,
+        fecha_hasta__gte=fecha_seleccionada
     ).select_related('docente__user', 'tipo_licencia').prefetch_related('bloques_afectados')
 
     grilla_bloques = []
@@ -197,9 +326,9 @@ def grilla_horaria(request):
     }
     return render(request, 'licencias/grilla_horaria.html', contexto)
 
-
+# ---- vista principal para el perfil de secretaría
+@login_required
 def dashboard_secretaria(request):
-    """ VISTA SECRETARIO/A (Basada en Regente con módulo administrativo) """
     request.session['perfil_activo'] = 'secretario'
     fecha_param = request.GET.get('fecha')
     
@@ -215,8 +344,10 @@ def dashboard_secretaria(request):
     nombre_dias = {1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves', 5: 'Viernes', 6: 'Sábado', 7: 'Domingo'}
     dia_actual_nombre = nombre_dias.get(dia_actual_num, 'Lunes')
 
+    # (Consulta por Rango de Fechas):
     licencias_hoy = SolicitudLicencia.objects.filter(
-        fecha_solicitud=fecha_seleccionada
+        fecha_solicitud__lte=fecha_seleccionada,
+        fecha_hasta__gte=fecha_seleccionada
     ).select_related('docente__user', 'tipo_licencia').prefetch_related('bloques_afectados')
 
     ausencias_procesadas = []
@@ -241,7 +372,7 @@ def dashboard_secretaria(request):
                     'suplencia': suplencia
                 })
 
-        if bloques_evaluados:
+        # SE INCLUYE SIEMPRE LA LICENCIA EN EL PANEL (con o sin horarios asignados)
             ausencias_procesadas.append({
                 'licencia': licencia,
                 'docente': licencia.docente,
@@ -259,7 +390,53 @@ def dashboard_secretaria(request):
     
     return render(request, 'licencias/dashboard_secretaria.html', contexto)
 
+# ---- vista principal para el perfil de docente
+@login_required
+def dashboard_docente(request):
+    """ Vista exclusiva para que el docente consulte su horario y gestione sus licencias """
+    request.session['perfil_activo'] = 'docente'
+    
+    # Intentar obtener el perfil de docente vinculado al usuario
+    try:
+        docente = request.user.docente
+    except Exception:
+        messages.warning(request, "Tu usuario no tiene un perfil de Docente asociado en la base de datos.")
+        return redirect('dashboard_regencia')
 
+    # Días de la semana para mapear el horario
+    nombre_dias = {1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves', 5: 'Viernes', 6: 'Sábado', 7: 'Domingo'}
+
+    # 1. Obtener Horarios Asignados
+    horarios_queryset = HorarioDocente.objects.filter(
+        docente=docente
+    ).select_related('bloque', 'materia', 'curso').order_by('dia_semana', 'bloque__numero')
+
+    # Agrupar horarios por día de la semana
+    horarios_por_dia = {}
+    for h in horarios_queryset:
+        dia_nombre = nombre_dias.get(h.dia_semana, f'Día {h.dia_semana}')
+        if dia_nombre not in horarios_por_dia:
+            horarios_por_dia[dia_nombre] = []
+        horarios_por_dia[dia_nombre].append(h)
+
+    # 2. Obtener Licencias Solicitadas por el docente
+    licencias = SolicitudLicencia.objects.filter(
+        docente=docente
+    ).select_related('tipo_licencia').prefetch_related('bloques_afectados').order_by('-fecha_solicitud')
+
+    contexto = {
+        'docente': docente,
+        'horarios_por_dia': horarios_por_dia,
+        'tiene_horarios': horarios_queryset.exists(),
+        'licencias': licencias,
+        'perfil_actual': 'docente'
+    }
+    return render(request, 'licencias/dashboard_docente.html', contexto)
+
+# ------------------------------------------------------------
+# ---- Vistas para registrar, editar y eliminar inasistencias
+# ------------------------------------------------------------
+@login_required
 def registrar_inasistencia(request):
     docente_id = request.GET.get('docente_id')
     fecha_param = request.GET.get('fecha')
@@ -289,6 +466,7 @@ def registrar_inasistencia(request):
     return render(request, 'licencias/registrar_inasistencia.html', {'form': form, 'docente': docente_inicial})
 
 
+@login_required
 def editar_inasistencia(request, licencia_id):
     licencia = get_object_or_404(SolicitudLicencia, id=licencia_id)
     
@@ -303,6 +481,7 @@ def editar_inasistencia(request, licencia_id):
     return render(request, 'licencias/editar_inasistencia.html', {'form': form, 'licencia': licencia})
 
 
+@login_required
 def eliminar_inasistencia(request, licencia_id):
     licencia = get_object_or_404(SolicitudLicencia, id=licencia_id)
     fecha_redireccion = licencia.fecha_solicitud
@@ -312,3 +491,5 @@ def eliminar_inasistencia(request, licencia_id):
         return redirect(f"/?fecha={fecha_redireccion}")
 
     return render(request, 'licencias/confirmar_eliminar.html', {'licencia': licencia})
+
+# --------------------------------------------------

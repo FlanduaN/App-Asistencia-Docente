@@ -1,0 +1,143 @@
+{% extends 'licencias/base.html' %}
+
+{% block title %}Mi Panel Docente - Sistema de Asistencia{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- CABECERA DEL DOCENTE -->
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-4">
+        <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+                Portal Docente
+            </span>
+            <h1 class="text-2xl font-bold text-slate-800 mt-2">
+                ¡Hola, {{ docente.user.first_name }} {{ docente.user.last_name }}!
+            </h1>
+            <p class="text-sm text-slate-500 mt-1">
+                Legajo: <strong class="text-slate-700">{{ docente.legajo }}</strong> | 
+                DNI: <strong class="text-slate-700">{{ docente.dni }}</strong> | 
+                Correo: <strong class="text-slate-700">{{ docente.user.email }}</strong>
+            </p>
+        </div>
+
+        <!-- Botón de Acción Principal -->
+        <div>
+            <a href="{% url 'registrar_inasistencia' %}?docente_id={{ docente.id }}" 
+               class="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold text-sm rounded-lg shadow-sm transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Solicitar Licencia / Ausencia
+            </a>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 1: HORARIO ASIGNADO -->
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+            📅 Mi Horario Asignado
+        </h2>
+
+        {% if tiene_horarios %}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for dia, lista_horarios in horarios_por_dia.items %}
+                    <div class="border border-slate-200 rounded-lg p-4 bg-slate-50/50">
+                        <h3 class="font-bold text-slate-700 border-b pb-2 mb-3 text-sm uppercase tracking-wide">
+                            {{ dia }}
+                        </h3>
+                        <div class="space-y-2">
+                            {% for h in lista_horarios %}
+                                <div class="bg-white p-2.5 rounded border border-slate-200 text-xs shadow-2xs">
+                                    <div class="font-semibold text-slate-800">
+                                        {{ h.bloque.nombre }} ({{ h.bloque.hora_inicio|time:"H:i" }} - {{ h.bloque.hora_fin|time:"H:i" }})
+                                    </div>
+                                    <div class="text-slate-600 mt-1">
+                                        📖 <strong>{{ h.materia.nombre }}</strong> — 🏫 {{ h.curso.nombre }}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <!-- ESTADO VACÍO CUANDO NO HAY HORARIO -->
+            <div class="p-8 text-center bg-amber-50/60 rounded-xl border border-dashed border-amber-200">
+                <div class="text-3xl mb-2">📌</div>
+                <h3 class="font-bold text-amber-900 text-base">No tienes horario asignado aún</h3>
+                <p class="text-amber-700 text-sm mt-1">
+                    La Regencia o Secretaría todavía no ha cargado tus bloques de clases en el sistema.
+                </p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- SECCIÓN 2: HISTORIAL DE LICENCIAS Y AUSENCIAS -->
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+            📋 Mis Solicitudes e Inasistencias Presentadas
+        </h2>
+
+        {% if licencias %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-slate-600">
+                    <thead class="bg-slate-100 text-slate-700 font-bold uppercase text-xs">
+                        <tr>
+                            <th class="p-3 rounded-l-lg">Fecha Solicitada</th>
+                            <th class="p-3">Tipo de Licencia</th>
+                            <th class="p-3">Alcance / Incidencia</th>
+                            <th class="p-3">Comprobante</th>
+                            <th class="p-3 rounded-r-lg text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for lic in licencias %}
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-3 font-semibold text-slate-800">
+                                    {{ lic.fecha_solicitud|date:"d/m/Y" }}
+                                </td>
+                                <td class="p-3">
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                        {{ lic.tipo_licencia.nombre }}
+                                    </span>
+                                </td>
+                                <td class="p-3 text-xs">
+                                    {% if lic.tipo_incidencia == 'JORNADA_COMPLETA' %}
+                                        <span class="text-slate-700 font-semibold">Jornada Completa</span>
+                                    {% elif lic.tipo_incidencia == 'BLOQUES' %}
+                                        <span class="text-amber-700 font-semibold">Bloques Específicos</span>
+                                    {% elif lic.tipo_incidencia == 'TARDE' %}
+                                        <span class="text-purple-700 font-semibold">Llegada Tarde ({{ lic.minutos_tarde }} min)</span>
+                                    {% elif lic.tipo_incidencia == 'RETIRO' %}
+                                        <span class="text-indigo-700 font-semibold">Retiro Anticipado ({{ lic.minutos_retiro }} min)</span>
+                                    {% endif %}
+                                </td>
+                                <td class="p-3 text-xs">
+                                    {% if lic.comprobante %}
+                                        <a href="{{ lic.comprobante.url }}" target="_blank" class="text-amber-600 font-bold hover:underline">
+                                            📎 Ver Adjunto
+                                        </a>
+                                    {% else %}
+                                        <span class="text-slate-400">Sin archivo</span>
+                                    {% endif %}
+                                </td>
+                                <td class="p-3 text-center">
+                                    <a href="{% url 'editar_inasistencia' lic.id %}" class="text-slate-600 hover:text-amber-600 font-semibold text-xs mr-2">
+                                        Editar
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="text-sm text-slate-500 italic py-2">
+                No has registrado solicitudes ni inasistencias en el sistema hasta el momento.
+            </p>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

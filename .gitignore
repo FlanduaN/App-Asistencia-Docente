@@ -24,3 +24,6 @@ Thumbs.db
 
 # 6. Archivos Excel de prueba local
 *.xlsx
+
+# 7. Archivos de configuración de entorno local
+.env
