@@ -1,9 +1,9 @@
 from django import forms
 from django.contrib.auth.models import User
 from django.utils.crypto import get_random_string
-from .models import SolicitudLicencia, Docente
+from .models import SolicitudLicencia, Docente, Materia, HorarioDocente, Suplencia
 
-# Función para obtener el siguiente legajo disponible
+# --- Función para obtener el siguiente legajo disponible ---
 def obtener_siguiente_legajo():
     """ Busca el número de legajo numérico más alto registrado y sugiere el siguiente """
     docentes = Docente.objects.all()
@@ -16,6 +16,7 @@ def obtener_siguiente_legajo():
         return str(max(legajos_numericos) + 1)
     return "1001"  # Valor inicial por defecto si no hay legajos cargados
 
+# --- FORMULARIO DE ALTA DE DOCENTE ---
 class AltaDocenteForm(forms.Form):
     first_name = forms.CharField(label="Nombre", max_length=150, widget=forms.TextInput(attrs={'class': 'w-full p-2.5 border rounded-lg'}))
     last_name = forms.CharField(label="Apellido", max_length=150, widget=forms.TextInput(attrs={'class': 'w-full p-2.5 border rounded-lg'}))
@@ -81,7 +82,7 @@ class AltaDocenteForm(forms.Form):
 
         return docente, password_provisoria, username
 
-# Formulario para la creación de una solicitud de licencia
+# --- FORMULARIO DE SOLICITUD DE LICENCIA ---
 class SolicitudLicenciaForm(forms.ModelForm):
     class Meta:
         model = SolicitudLicencia
@@ -123,4 +124,90 @@ class SolicitudLicenciaForm(forms.ModelForm):
         elif fecha_solicitud and not fecha_hasta:
             cleaned_data['fecha_hasta'] = fecha_solicitud
 
+        return cleaned_data
+
+# --- FORMULARIO DE ALTA DE MATERIA ---
+class MateriaForm(forms.ModelForm):
+    class Meta:
+        model = Materia
+        fields = ['nombre', 'tipo_modalidad']
+        widgets = {
+            'nombre': forms.TextInput(attrs={
+                'class': 'w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-indigo-500'
+            }),
+            'tipo_modalidad': forms.Select(attrs={
+                'class': 'w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-indigo-500'
+            }),
+        }
+
+# --- FORMULARIO DE ALTA DE HORARIO DOCENTE ---
+class HorarioDocenteForm(forms.ModelForm):
+    class Meta:
+        model = HorarioDocente
+        fields = ['docente', 'materia', 'curso', 'dia_semana', 'bloque', 'rol', 'seccion']
+        widgets = {
+            'docente': forms.Select(attrs={'class': 'w-full p-2.5 border rounded-lg bg-white'}),
+            'materia': forms.Select(attrs={'class': 'w-full p-2.5 border rounded-lg bg-white'}),
+            'curso': forms.Select(attrs={'class': 'w-full p-2.5 border rounded-lg bg-white'}),
+            'dia_semana': forms.Select(attrs={'class': 'w-full p-2.5 border rounded-lg bg-white'}),
+            'bloque': forms.Select(attrs={'class': 'w-full p-2.5 border rounded-lg bg-white'}),
+            'rol': forms.Select(attrs={'class': 'w-full p-2.5 border rounded-lg bg-white'}),
+            'seccion': forms.TextInput(attrs={
+                'class': 'w-full p-2.5 border rounded-lg bg-white',
+                'placeholder': 'Ej: Grupo A, Laboratorio 1 (Opcional)'
+            }),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        docente = cleaned_data.get('docente')
+        bloque = cleaned_data.get('bloque')
+        dia_semana = cleaned_data.get('dia_semana')
+
+        # Validación: Evitar que el MISMO docente se superponga consigo mismo en dos aulas al mismo tiempo
+        if docente and bloque and dia_semana:
+            existente = HorarioDocente.objects.filter(
+                docente=docente,
+                bloque=bloque,
+                dia_semana=dia_semana
+            )
+            if self.instance.pk:
+                existente = existente.exclude(pk=self.instance.pk)
+            
+            if existente.exists():
+                self.add_error('bloque', f"El docente {docente} ya tiene asignada otra clase en este mismo bloque y día.")
+
+        return cleaned_data
+
+# --- FORMULARIO DE ALTA DE SUPLENCIA ---
+class SuplenciaForm(forms.ModelForm):
+    class Meta:
+        model = Suplencia
+        fields = ['tipo_cobertura', 'docente_suplente', 'observaciones']
+        widgets = {
+            'tipo_cobertura': forms.Select(attrs={
+                'class': 'w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-indigo-500',
+                'id': 'select_tipo_cobertura'
+            }),
+            'docente_suplente': forms.Select(attrs={
+                'class': 'w-full p-2.5 border rounded-lg bg-white focus:ring-2 focus:ring-indigo-500',
+                'id': 'select_docente_suplente'
+            }),
+            'observaciones': forms.Textarea(attrs={
+                'class': 'w-full p-2.5 border rounded-lg bg-white',
+                'rows': 2,
+                'placeholder': 'Anotaciones opcionales sobre la cobertura...'
+            }),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        tipo_cobertura = cleaned_data.get('tipo_cobertura')
+        docente_suplente = cleaned_data.get('docente_suplente')
+
+        # Si la cobertura es externa, es obligatorio elegir un docente suplente
+        if tipo_cobertura == 'EXTERNA' and not docente_suplente:
+            self.add_error('docente_suplente', "Debe seleccionar un docente suplente para la cobertura externa.")
+
+        # En caso de absorción o Jefe de Lab, si no seleccionan suplente, no arroja error
         return cleaned_data

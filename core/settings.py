@@ -2,6 +2,19 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
+# Configuración de VSCode para formateo automático
+{
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnSave": True
+  },
+
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
+}
+
 # Rutas del proyecto
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -90,3 +103,4 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard_regencia'
 LOGOUT_REDIRECT_URL = 'login'
+

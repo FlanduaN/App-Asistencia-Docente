@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+# --- MODELO DOCENTE ---
 class Docente(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     legajo = models.CharField(max_length=20, unique=True)
@@ -11,7 +12,7 @@ class Docente(models.Model):
     def __str__(self):
         return f"{self.user.last_name}, {self.user.first_name} ({self.legajo})"
 
-
+# --- MODELO TIPO DE LICENCIA ---
 class TipoLicencia(models.Model):
     codigo = models.CharField(max_length=10, unique=True)
     nombre = models.CharField(max_length=100)
@@ -20,7 +21,7 @@ class TipoLicencia(models.Model):
     def __str__(self):
         return f"{self.codigo} - {self.nombre}"
 
-
+# --- MODELO CURSO ---
 class Curso(models.Model):
     nombre = models.CharField(max_length=50)
     turno = models.CharField(max_length=20, choices=[('MAÑANA', 'Mañana'), ('TARDE', 'Tarde'), ('NOCHE', 'Noche')])
@@ -29,14 +30,26 @@ class Curso(models.Model):
         return f"{self.nombre} ({self.turno})"
 
 
+# --- MODELO MATERIA ---
 class Materia(models.Model):
+    MODALIDADES = [
+        ('CATEDRA', 'Cátedra Única (1 Docente)'),
+        ('PAREJA', 'Pareja Pedagógica (Absorbible)'),
+        ('TALLER', 'Taller / Laboratorio (Por Secciones)'),
+    ]
+
     nombre = models.CharField(max_length=100)
-    color_hex = models.CharField(max_length=7, default='#3B82F6')
+    tipo_modalidad = models.CharField(
+        max_length=20, 
+        choices=MODALIDADES, 
+        default='CATEDRA',
+        verbose_name="Tipo de Modalidad"
+    )
 
     def __str__(self):
-        return self.nombre
+        return f"{self.nombre} ({self.get_tipo_modalidad_display()})"
 
-
+# --- MODELO BLOQUE HORARIO ---
 class BloqueHorario(models.Model):
     numero = models.IntegerField()
     hora_inicio = models.TimeField()
@@ -49,25 +62,48 @@ class BloqueHorario(models.Model):
         return f"Bloque {self.numero} ({self.hora_inicio.strftime('%H:%M')} - {self.hora_fin.strftime('%H:%M')})"
 
 
+# --- MODELO HORARIO DOCENTE ---
 class HorarioDocente(models.Model):
-    DIAS_SEMANA = [
-        (1, 'Lunes'),
-        (2, 'Martes'),
-        (3, 'Miércoles'),
-        (4, 'Jueves'),
-        (5, 'Viernes'),
-        (6, 'Sábado'),
+    ROLES = [
+        ('TITULAR', 'Titular / Responsable Primario'),
+        ('CO_DOCENTE', 'Co-docente / Pareja Pedagógica'),
+        ('JEFE_LAB', 'Jefe de Laboratorio / Apoyo Técnico'),
     ]
-    docente = models.ForeignKey(Docente, on_delete=models.CASCADE, related_name='horarios')
+
+    docente = models.ForeignKey('Docente', on_delete=models.CASCADE)
+    bloque = models.ForeignKey('BloqueHorario', on_delete=models.CASCADE)
     materia = models.ForeignKey(Materia, on_delete=models.CASCADE)
-    curso = models.ForeignKey(Curso, on_delete=models.CASCADE)
-    bloque = models.ForeignKey(BloqueHorario, on_delete=models.CASCADE)
-    dia_semana = models.IntegerField(choices=DIAS_SEMANA)
+    curso = models.ForeignKey('Curso', on_delete=models.CASCADE)
+    dia_semana = models.IntegerField(choices=[
+        (1, 'Lunes'), (2, 'Martes'), (3, 'Miércoles'),
+        (4, 'Jueves'), (5, 'Viernes'), (6, 'Sábado')
+    ])
+    
+    # Campos para parejas y talleres
+    rol = models.CharField(
+        max_length=20, 
+        choices=ROLES, 
+        default='TITULAR',
+        verbose_name="Rol en la Clase"
+    )
+    seccion = models.CharField(
+        max_length=50, 
+        blank=True, 
+        null=True, 
+        verbose_name="Sección / Subgrupo (Ej: Grupo A, Taller 1)"
+    )
+
+    class Meta:
+        # Nota: Asegurarse de que NO exista ninguna restricción unique_together 
+        # entre (bloque, dia_semana, curso) para permitir múltiples docentes por bloque.
+        verbose_name = "Horario Docente"
+        verbose_name_plural = "Horarios Docentes"
 
     def __str__(self):
-        return f"{self.docente} - {self.materia} - {self.curso} - Día {self.dia_semana}"
+        sec_str = f" - {self.seccion}" if self.seccion else ""
+        return f"{self.docente} - {self.materia.nombre}{sec_str} ({self.get_rol_display()})"
 
-
+# --- MODELO SOLICITUD DE LICENCIA ---
 class SolicitudLicencia(models.Model):
     ESTADOS = [
         ('PENDIENTE', 'Pendiente'),
@@ -107,12 +143,33 @@ class SolicitudLicencia(models.Model):
     def __str__(self):
         return f"Licencia {self.docente.user.last_name} - {self.fecha_solicitud} [{self.estado}]"
 
-
+# --- MODELO SUPLENCIA ---
 class Suplencia(models.Model):
-    licencia = models.ForeignKey(SolicitudLicencia, on_delete=models.CASCADE, related_name='suplencias')
+    TIPOS_COBERTURA = [
+        ('EXTERNA', 'Suplente Externo'),
+        ('ABSORCION', 'Absorción por Pareja Pedagógica'),
+        ('JEFE_LAB', 'Asumido por Jefe de Laboratorio'),
+    ]
+
+    licencia = models.ForeignKey('SolicitudLicencia', on_delete=models.CASCADE)
     horario = models.ForeignKey(HorarioDocente, on_delete=models.CASCADE)
-    docente_suplente = models.ForeignKey(Docente, on_delete=models.CASCADE, related_name='suplencias_realizadas')
     fecha = models.DateField()
+    
+    # El docente suplente ahora es Opcional (null=True) en caso de absorción interna
+    docente_suplente = models.ForeignKey(
+        'Docente', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        verbose_name="Docente Suplente (Si aplica)"
+    )
+    tipo_cobertura = models.CharField(
+        max_length=20, 
+        choices=TIPOS_COBERTURA, 
+        default='EXTERNA',
+        verbose_name="Tipo de Cobertura"
+    )
+    observaciones = models.TextField(blank=True, null=True)
 
     def __str__(self):
-        return f"Suplencia: {self.docente_suplente} en {self.horario.curso} ({self.fecha})"
+        return f"Cobertura {self.fecha} - {self.horario.materia.nombre} ({self.get_tipo_cobertura_display()})"
